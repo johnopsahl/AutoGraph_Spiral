@@ -97,6 +97,26 @@ def write_segments_and_points_to_svg(filename, segment, seg_center, view_box):
                 width=view_box[2], height=view_box[3])
     dwg.save()
 
+def write_segments_seg_centers_and_seg_center_pixels_to_svg(filename, segment, seg_center, seg_center_pixel, view_box):
+    
+    dwg = svgwrite.Drawing(filename + '.svg')
+
+    for seg in segment:          
+
+        dwg.add(dwg.line(seg[0], seg[1], stroke=svgwrite.rgb(0, 0, 0), stroke_width=0.1))
+
+    for pnt in seg_center:
+
+        dwg.add(dwg.circle(center=(pnt[0], pnt[1]), r=0.1, fill='blue', stroke='blue', stroke_width=0.1))
+    
+    for pnt in seg_center_pixel:
+
+        dwg.add(dwg.circle(center=(pnt[0], pnt[1]), r=0.1, fill='red', stroke='red', stroke_width=0.1))
+
+    dwg.viewbox(minx=view_box[0], miny=view_box[1], 
+                width=view_box[2], height=view_box[3])
+    dwg.save()
+
 # def convert_bitmap_to_spiral_drawing(image_filename: str, 
 #                                      a: float, b: float, 
 #                                      segment_length: float):
@@ -174,9 +194,50 @@ def display_spiral_segments_and_centers(a, b, segment_length, theta_end):
     write_segments_and_points_to_svg("spiral_segments_centers", 
                                      segment_filtered, seg_center, view_box)
 
+def size_and_display_spiral_segments_and_centers(image_filename, drawing_width_mm, a, spiral_pitch_mm, segment_length_mm):
+    
+    img = Image.open(image_filename)
+
+    mm_per_pixel = drawing_width_mm/img.size[0]
+    drawing_height_mm = img.size[1]*mm_per_pixel
+    drawing_hypotenuse_mm = np.sqrt(drawing_width_mm**2 + drawing_height_mm**2)
+
+    # calculate b based on desired spiral pitch
+    b = spiral_pitch_mm/(2*np.pi)
+
+    # using the drawing hypotenuse to determine the number of rotations is a bit hacky for all spiral center positions, 
+    # but it ensures the spiral extends beyond the corners of the drawing
+    num_rotations = drawing_hypotenuse_mm/(4*np.pi*b) + 1
+    theta_end = num_rotations*2*np.pi
+
+    seg_point = generate_spiral_segment_points(a, b, segment_length_mm, 0, theta_end)
+
+    # translate center of spiral
+    spiral_center = np.array([drawing_width_mm/2, drawing_height_mm/2])
+    seg_point_trans = seg_point + spiral_center
+
+    segment = create_segments_from_segment_points(seg_point_trans)
+
+    segment_filtered = remove_out_of_bounds_segments(segment, 0, drawing_width_mm, 0, drawing_height_mm)
+
+    # create segment centers from segments
+    seg_center = create_segment_centers(segment_filtered)
+
+    # assign pixel to each segment center, making sure to snap to pixel centers at 0.5 increments
+    seg_center_pixel = np.floor((seg_center + np.array([0.5, 0.5]))/mm_per_pixel).astype(int)
+    seg_center_pixel_mm = seg_center_pixel*mm_per_pixel
+
+    view_box = [0, 0, drawing_width_mm, drawing_height_mm]
+    write_segments_seg_centers_and_seg_center_pixels_to_svg("spiral_sized", segment_filtered, seg_center, seg_center_pixel_mm, view_box)
+    
 if __name__ == '__main__':
 
     # convert_bitmap_to_spiral("margaret_gym.png", 0, 1.5, 5, theta_end)
     display_spiral_segments(0, 0.3, 0.5, 8*np.pi)
     clip_spiral_segments_to_image_boundaries(0, 0.3, 0.5, 8*np.pi)
     display_spiral_segments_and_centers(0, 0.05, 0.5, 64*np.pi)
+    size_and_display_spiral_segments_and_centers(image_filename='margaret_gym.png', 
+                                                 drawing_width_mm=100, 
+                                                 a=0, 
+                                                 spiral_pitch_mm=0.7, 
+                                                 segment_length_mm=0.5)

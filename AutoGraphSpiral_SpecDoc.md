@@ -9,7 +9,11 @@ A script that generates AutoGraph pencil plotter gcode in a archimedes spiral pa
 
 ## Development Steps
 1. ~~generate spiral segments and display as svg~~
-2. ~~clip spiral coverage to image boundaries and display~~
-3. create segement centers and nearest pixel center for each center and display
-4. compare spiral segment centers to source image pixel colors and display
-5. generate gcode and inspect in gcode viewer
+2. ~~clip spiral coverage to image boundaries~~
+3. ~~create segment centers~~
+4. ~~create spiral as large as input image~~
+5. ~~move center of spiral~~
+6. determine the number of turns required to achieve image coverage
+7. create segement centers and nearest pixel center for each center
+8. compare spiral segment centers to source image pixel colors
+9. generate gcode and inspect in gcode viewer
