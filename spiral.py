@@ -69,6 +69,29 @@ def create_segment_centers(segment):
 
     return np.mean(segment, axis=(1))
 
+def write_segments_to_gcode(gcode_filename, segment, segment_color, feedrate):
+
+    with open(gcode_filename + '.gcode', 'w') as f:
+        for i, seg in enumerate(segment):
+            
+            if i == 0:
+                # move to starting point of first segment and set feedrate for whole drawing
+                f.write(f"G0 X{seg[0][0]:.3f} Y{seg[0][1]:.3f} F{feedrate:.2f}\n")
+                f.write("M3 S0\n")  # turn on pwm at 0  
+            else:
+                # G0 move if beginning of segment is not the same as end of previous segment
+                if not np.array_equal(segment[i-1][1], segment[i][0]):
+                    f.write(f"G0 X{seg[1][0]:.3f} Y{seg[1][1]:.3f} S0\n")
+
+            # convert color to grayscale value between 0 and 255
+            color_value = segment_color[i]
+            # interpolate grayscale value to pencil force
+            pencil_force = np.interp(color_value, [0, 255], [1000, 0])
+
+            f.write(f"G1 X{seg[1][0]:.3f} Y{seg[1][1]:.3f} S{pencil_force:.0f}\n")
+
+    f.close()
+
 def write_segments_to_svg(filename: str, segment, view_box):
     
     dwg = svgwrite.Drawing(filename + '.svg')
@@ -97,67 +120,32 @@ def write_segments_and_points_to_svg(filename, segment, seg_center, view_box):
                 width=view_box[2], height=view_box[3])
     dwg.save()
 
-def write_segments_seg_centers_and_seg_center_pixels_to_svg(filename, segment, seg_center, seg_center_pixel, view_box):
+def write_segments_seg_centers_and_seg_center_pixels_to_svg(filename, segment, segement_color,
+                                                            seg_center, seg_center_pixel, pixel_center_coord, view_box):
     
     dwg = svgwrite.Drawing(filename + '.svg')
 
-    for seg in segment:          
+    for i, seg in enumerate(segment):          
 
-        dwg.add(dwg.line(seg[0], seg[1], stroke=svgwrite.rgb(0, 0, 0), stroke_width=0.1))
+        dwg.add(dwg.line(seg[0], seg[1], stroke=svgwrite.rgb(segement_color[i], segement_color[i], segement_color[i]), stroke_width=0.1))
 
-    for pnt in seg_center:
+    # for pnt in seg_center:
 
-        dwg.add(dwg.circle(center=(pnt[0], pnt[1]), r=0.1, fill='blue', stroke='blue', stroke_width=0.1))
+    #     dwg.add(dwg.circle(center=(pnt[0], pnt[1]), r=0.1, fill='blue', stroke='blue', stroke_width=0.1))
     
-    for pnt in seg_center_pixel:
+    # for pnt in seg_center_pixel:
 
-        dwg.add(dwg.circle(center=(pnt[0], pnt[1]), r=0.1, fill='red', stroke='red', stroke_width=0.1))
+    #     dwg.add(dwg.circle(center=(pnt[0], pnt[1]), r=0.09, fill='red', stroke='red', stroke_width=0.09))
+
+    # for pnt in pixel_center_coord:
+
+    #     dwg.add(dwg.circle(center=(pnt[0], pnt[1]), r=0.05, fill='green', stroke='green', stroke_width=0.05))
+
+    # dwg.add(dwg.circle(center=(0, 0), r=0.1, fill='purple', stroke='purple', stroke_width=0.1))
 
     dwg.viewbox(minx=view_box[0], miny=view_box[1], 
                 width=view_box[2], height=view_box[3])
     dwg.save()
-
-# def convert_bitmap_to_spiral_drawing(image_filename: str, 
-#                                      a: float, b: float, 
-#                                      segment_length: float):
-#     """Creates line segments along an Archimedes spiral."""
-
-#     # Import image  
-#     img = np.array(Image.open(image_filename))
-
-#     # Set spiral center
-#     spiral_center = np.array([img.size[0] // 2 + 0.5, img.size[1] // 2 + 0.5])
-
-#     # Convert image to grayscale
-#     img_gray = img.convert("L")
-    
-#     # Determine the angle at which the spiral should end 
-#     #theta_end = calc_spiral_end(img_width, imag_height)
-
-#     # Generate spiral segment end points
-#     seg_point = generate_spiral_segment_points(a, b, segment_length, 0, theta_end)
-
-#     # Translate segment ceneters by spiral center
-#     seg_point_trans = seg_point - spiral_center
-
-#     # Generate spiral segment center points
-#     seg_center = generate_spiral_segment_points(a, b, segment_length, segment_length/2, theta_end)
-    
-#     # Translate segement centers by spiral center
-#     seg_center_trans = seg_center - spiral_center 
-
-#     #TODO: Make sure this snaps to pixel centers at 0.5 increments
-#     # Determine pixel index neareset to each segment center point
-#     seg_center_pixel = np.floor(seg_center).astype(int)
-
-#     # Get color of each pixel index 
-#     # seg_color = img[seg_center_pixel[:, 1], seg_center_pixel[:, 0]]
-
-#     # Scale segement points according to drawing width
-#     seg_point_scaled = seg_point_trans*(drawing_width/img.size[0])
-
-#     # Write the segments to svg
-#     write_segments_to_svg("spiral", seg_point_scaled, 0.1)
 
 def display_spiral_segments(a, b, segment_length, theta_end):
     
@@ -194,12 +182,14 @@ def display_spiral_segments_and_centers(a, b, segment_length, theta_end):
     write_segments_and_points_to_svg("spiral_segments_centers", 
                                      segment_filtered, seg_center, view_box)
 
-def size_and_display_spiral_segments_and_centers(image_filename, drawing_width_mm, a, spiral_pitch_mm, segment_length_mm):
+def size_and_display_spiral_segments_and_centers(image_filename, drawing_width_mm, 
+                                                 a, spiral_pitch_mm, segment_length_mm):
     
     img = Image.open(image_filename)
+    image_pixel_width, image_pixel_height = img.size
 
-    mm_per_pixel = drawing_width_mm/img.size[0]
-    drawing_height_mm = img.size[1]*mm_per_pixel
+    mm_per_pixel = drawing_width_mm/image_pixel_width
+    drawing_height_mm = image_pixel_height*mm_per_pixel
     drawing_hypotenuse_mm = np.sqrt(drawing_width_mm**2 + drawing_height_mm**2)
 
     # calculate b based on desired spiral pitch
@@ -224,20 +214,41 @@ def size_and_display_spiral_segments_and_centers(image_filename, drawing_width_m
     seg_center = create_segment_centers(segment_filtered)
 
     # assign pixel to each segment center, making sure to snap to pixel centers at 0.5 increments
-    seg_center_pixel = np.floor((seg_center + np.array([0.5, 0.5]))/mm_per_pixel).astype(int)
-    seg_center_pixel_mm = seg_center_pixel*mm_per_pixel
+    seg_center_pixel_index = np.floor(seg_center/mm_per_pixel).astype(int)
+    seg_center_pixel_coords = seg_center_pixel_index + np.array([0.5, 0.5])
+    seg_center_pixel_mm = seg_center_pixel_coords*mm_per_pixel 
+
+    # convert image to grayscale
+    img_gray = np.array(img.convert("L")) #convert image to grayscale
+
+    # get color of each pixel index
+    segment_color = img_gray[seg_center_pixel_index[:, 1], seg_center_pixel_index[:, 0]]
+
+    # For troubleshooting
+    # create a list of all pixel center coordinates in mm to compare against segment center pixels for debugging
+    rows, cols = np.mgrid[0:image_pixel_width, 0:image_pixel_height]
+    pixel_index = np.c_[rows.ravel(), cols.ravel()]
+    pixel_center_coord = pixel_index + np.array([0.5, 0.5])
+    pixel_center_coord_mm = pixel_center_coord*mm_per_pixel
 
     view_box = [0, 0, drawing_width_mm, drawing_height_mm]
-    write_segments_seg_centers_and_seg_center_pixels_to_svg("spiral_sized", segment_filtered, seg_center, seg_center_pixel_mm, view_box)
+    write_segments_seg_centers_and_seg_center_pixels_to_svg("spiral_sized", segment_filtered, segment_color, seg_center, 
+                                                            seg_center_pixel_mm, pixel_center_coord_mm, view_box)
     
+    # invert y axis for gcode since svg and image coordinates have y increasing downwards but gcode has y increasing upwards
+    segment_filtered[:, :, 1] = drawing_height_mm - segment_filtered[:, :, 1]
+    
+    write_segments_to_gcode("gcode_output", segment_filtered, segment_color, 250)
+    
+
 if __name__ == '__main__':
 
     # convert_bitmap_to_spiral("margaret_gym.png", 0, 1.5, 5, theta_end)
     display_spiral_segments(0, 0.3, 0.5, 8*np.pi)
     clip_spiral_segments_to_image_boundaries(0, 0.3, 0.5, 8*np.pi)
     display_spiral_segments_and_centers(0, 0.05, 0.5, 64*np.pi)
-    size_and_display_spiral_segments_and_centers(image_filename='margaret_gym.png', 
+    size_and_display_spiral_segments_and_centers(image_filename='margaret gym_gray.png', 
                                                  drawing_width_mm=100, 
                                                  a=0, 
                                                  spiral_pitch_mm=0.7, 
-                                                 segment_length_mm=0.5)
+                                                 segment_length_mm=.25)

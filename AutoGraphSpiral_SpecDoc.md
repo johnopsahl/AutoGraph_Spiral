@@ -1,7 +1,7 @@
 # AutoGraph Spiral
 
 ## Description
-A script that generates AutoGraph pencil plotter gcode in a archimedes spiral pattern. Based on a source image.
+A script that maps a bitmap image to segments of an Archimedes spiral. Outputs a gcode file for the AutoGraph pencil plotter.
 
 ## CONOPS
 1. User inputs reference image, drawing dimensions (in milimeters), and sprial parameters.
@@ -13,7 +13,9 @@ A script that generates AutoGraph pencil plotter gcode in a archimedes spiral pa
 3. ~~create segment centers~~
 4. ~~create spiral as large as input image~~
 5. ~~move center of spiral~~
-6. determine the number of turns required to achieve image coverage
-7. create segement centers and nearest pixel center for each center
-8. compare spiral segment centers to source image pixel colors
+6. ~~determine the number of turns required to achieve image coverage~~
+7. ~~map segment centers to nearest pixel center~~
+8. ~~compare spiral segment centers to source image pixel colors~~
 9. generate gcode and inspect in gcode viewer
+10. remove all segements with segement color 255
+11. allow option to reverse direction of spiral
